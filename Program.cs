@@ -21,7 +21,7 @@ namespace HussAPI
         {
             return
                 WebHost.CreateDefaultBuilder(args)
-                .UseKestrel()
+                //.UseKestrel()
                 .UseContentRoot(Directory.GetCurrentDirectory())
                 .ConfigureAppConfiguration((hostingContext, config) =>
                 {
@@ -38,7 +38,7 @@ namespace HussAPI
                     logging.AddDebug();
                     //logging.AddEventSourceLogger();
                 })
-                .UseUrls("http://*:1967;http://localhost:1968;https://hostname:5000")
+                .UseUrls("http://*:1967;http://0.0.0.0:1968;https://hostname:5000")
                 .UseStartup<Startup>();
         }
     }
