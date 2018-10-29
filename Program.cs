@@ -38,7 +38,7 @@ namespace HussAPI
                     logging.AddDebug();
                     //logging.AddEventSourceLogger();
                 })
-                .UseUrls("http://*:1967;http://0.0.0.0:1968;https://hostname:5000")
+                .UseUrls("http://*:1967;http://0.0.0.0:1968")
                 .UseStartup<Startup>();
         }
     }
