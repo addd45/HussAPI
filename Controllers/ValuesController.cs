@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 
 namespace HussAPI.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("HussAPI/[controller]")]
     [ApiController]
     public class ValuesController : ControllerBase
     {
