@@ -85,6 +85,25 @@ namespace HussAPI.Classes
             }
         }
 
+        public async Task SendConfigData(string data)
+        {
+            var message = new MqttApplicationMessageBuilder()
+                .WithTopic(_mqttSettings.ScoreConfig)
+                .WithExactlyOnceQoS()
+                .WithPayload(data)
+                .Build();
+            try
+            {
+                _log.LogInformation("Sending MQTT Message with topic {0}", _mqttSettings.ScoreConfig);
+                _log.LogDebug($"Message: {Environment.NewLine} {data}");
+                await _mqttClient.PublishAsync(message);
+            }
+            catch (Exception e)
+            {
+                _log.LogError("Error sending MQTT message: {0}", e.Message);
+            }
+        }        
+
         private IMqttClient InitializeMqtt(string addr, string user, string pw)
         {
             var factory = new MqttFactory();
