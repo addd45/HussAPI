@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 
 namespace HussAPI.Classes
 {
-    public class MqttHelper
+    public class MqttHelper:IDisposable
     {
         public const string MQTT_PASS_ENVIRONMENT_NAME = "MQTT_PASS";
         readonly MQTTSettings _mqttSettings;
@@ -125,6 +125,11 @@ namespace HussAPI.Classes
                     else { Thread.Sleep(690); }
                 }
             }
+        }
+
+        public void Dispose()
+        {
+            _mqttClient.Dispose();
         }
 
         public bool IsConnected => _mqttClient.IsConnected;

@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace HussAPI.Interfaces
 {
-    interface IScrapingService: IHostedService, IDisposable
+    public interface IScrapingService: IHostedService, IDisposable
     {
         void ExecuteScrape(object gamePk);
         Task<Tuple<bool, TimeSpan, string>> GameDayCheck();
