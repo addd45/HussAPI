@@ -89,7 +89,7 @@ namespace HussAPI.Classes
         {
             var message = new MqttApplicationMessageBuilder()
                 .WithTopic(_mqttSettings.ScoreConfig)
-                .WithExactlyOnceQoS()
+                .WithAtLeastOnceQoS()
                 .WithPayload(data)
                 .Build();
             try
