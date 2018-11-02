@@ -17,7 +17,7 @@ namespace HussAPI.Classes
         BluesScraper _scraper;
         MqttHelper _mqttHelper;
         IOptions<MQTTSettings> _mqttOptions;
-        Timer _timer;
+        Timer _gameDayTimer, _liveUpdateTimer;
 
         public ScrapingService(ILogger<ScrapingService> logger, IOptions<MQTTSettings> mqttOptions)
         {
@@ -29,7 +29,7 @@ namespace HussAPI.Classes
         {
             _logger.LogInformation("Scraping Service starting");
             _mqttHelper = new MqttHelper(_mqttOptions, _logger);
-            _timer = new Timer(PollGameDay, null, TimeSpan.Zero, TimeSpan.FromHours(24));
+            _gameDayTimer = new Timer(PollGameDay, null, TimeSpan.Zero, TimeSpan.FromHours(24));
 
             return;
         }
@@ -55,7 +55,7 @@ namespace HussAPI.Classes
 
                 //Get timer setup to go once game 'starts'
                 _logger.LogInformation("Game apparently starting in about {0} hours ", timerStart.TotalHours);
-                var timerToGame = new Timer(ExecuteScrape, info.Item3, timerStart, TimeSpan.FromMilliseconds(-1));
+                _liveUpdateTimer = new Timer(ExecuteScrape, info.Item3, timerStart, TimeSpan.FromMilliseconds(-1));
                 _logger.LogInformation("Timer setup. Now we wait..");
             }
             else
@@ -82,6 +82,7 @@ namespace HussAPI.Classes
             _scraper = new BluesScraper(gameCode);
             _logger.LogDebug("BluesScraper Object built");
 
+            await _mqttHelper.SendConfigData("GameStart");
             //Begin our nifty long running task
             while (true)
             {
@@ -110,6 +111,11 @@ namespace HussAPI.Classes
                     _logger.LogCritical("Cannot continue");
                 }
             }
+
+            //Game Over
+            _logger.LogInformation("Game ended. Exiting scrape method");
+            await _mqttHelper.SendConfigData("GameEnd");
+            _liveUpdateTimer.Dispose();
         }
 
         public async Task<Tuple<bool, TimeSpan, string>> GameDayCheck()
@@ -132,7 +138,7 @@ namespace HussAPI.Classes
         public void Dispose()
         {
             _logger.LogDebug("Dispose()-ing");
-            _timer?.Dispose();
+            _gameDayTimer?.Dispose();
             _mqttHelper.Dispose();
             _scraper.Dispose();
         }
