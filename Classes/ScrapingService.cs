@@ -56,7 +56,7 @@ namespace HussAPI.Classes
                 //Get timer setup to go once game 'starts'
                 _logger.LogInformation("Game apparently starting in about {0} hours ", timerStart.TotalHours);
                 _liveUpdateTimer = new Timer(ExecuteScrape, info.Item3, timerStart, TimeSpan.FromMilliseconds(-1));
-                _logger.LogInformation("Timer setup. Now we wait.."); _liveUpdateTimer.
+                _logger.LogInformation("Timer setup. Now we wait..");
             }
             else
             {
