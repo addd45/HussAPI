@@ -9,5 +9,9 @@ namespace HussAPI
     {
         public static string BluesTeamNumber => "19";
         public static string NextGameURL => "https://statsapi.web.nhl.com/api/v1/teams/19/?expand=team.schedule.next";
+        public static string GameStartedCommand => "GameStart";
+        public static string GameEndedCommand => "GameEnd";
+        public static string ShowTimeCommand => "";
+
     }
 }

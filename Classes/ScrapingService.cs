@@ -82,7 +82,7 @@ namespace HussAPI.Classes
             _scraper = new BluesScraper(gameCode);
             _logger.LogDebug("BluesScraper Object built");
 
-            await _mqttHelper.SendConfigData("GameStart");
+            await _mqttHelper.SendConfigData(Constants.GameStartedCommand);
             //Begin our nifty long running task
             while (true)
             {
@@ -94,6 +94,9 @@ namespace HussAPI.Classes
                     string json = JsonConvert.SerializeObject(data.Item1);
 
                     await _mqttHelper.SendData(json);
+
+                    //If critical action or less than 60seconds left, send command to show time remaining
+                    await SendShowTimeConfig(data);
 
                     //End execution 
                     if (delay == TimeSpan.Zero)
@@ -114,7 +117,7 @@ namespace HussAPI.Classes
 
             //Game Over
             _logger.LogInformation("Game ended. Exiting scrape method");
-            await _mqttHelper.SendConfigData("GameEnd");
+            await _mqttHelper.SendConfigData(Constants.GameEndedCommand);
             _liveUpdateTimer.Dispose();
         }
 
@@ -133,6 +136,14 @@ namespace HussAPI.Classes
             _logger.LogDebug("Time til game: {0} minutes. Is game day? {1}", timeTil.TotalMinutes, isGameDay);
 
             return Tuple.Create(isGameDay, timeTil, nextGameInfo.Item2);
+        }
+
+        private async Task SendShowTimeConfig(Tuple<NHLAPIScrape.GameInfo, NHLAPIScrape.GameStatuses> data)
+        {
+            if (data.Item2 == NHLAPIScrape.GameStatuses.CriticalAction || (data.Item1.TimeRemaining > 1 && data.Item1.TimeRemaining < 65))
+            {
+                await _mqttHelper.SendConfigData(Constants.ShowTimeCommand);
+            }
         }
 
         public void Dispose()
