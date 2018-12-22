@@ -88,13 +88,13 @@ namespace HussAPI.Classes
         public async Task SendConfigData(string data)
         {
             var message = new MqttApplicationMessageBuilder()
-                .WithTopic(_mqttSettings.ScoreConfig)
+                .WithTopic(_mqttSettings.ConfigTopic)
                 .WithAtLeastOnceQoS()
                 .WithPayload(data)
                 .Build();
             try
             {
-                _log.LogInformation("Sending MQTT Message with topic {0}", _mqttSettings.ScoreConfig);
+                _log.LogInformation("Sending MQTT Message with topic {0}", _mqttSettings.ConfigTopic);
                 _log.LogDebug($"Message: {Environment.NewLine} {data}");
                 await _mqttClient.PublishAsync(message);
             }
