@@ -7,7 +7,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using HussAPI.Classes;
+using HussAPI.Services;
 using Microsoft.AspNetCore.HttpOverrides;
 
 namespace HussAPI

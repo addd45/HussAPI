@@ -9,7 +9,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace HussAPI.Classes
+namespace HussAPI.Helpers
 {
     public class MqttHelper:IDisposable
     {
