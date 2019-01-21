@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using HussAPI.Services;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.EntityFrameworkCore;
 
 namespace HussAPI
 {
@@ -27,8 +28,14 @@ namespace HussAPI
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_1);
             services.Configure<MQTTSettings>(Configuration.GetSection("MQTTSettings"));
 
+            //DBContexts
+            string postgresPW = Environment.GetEnvironmentVariable("POSTGRES_PASS");
+            services.AddDbContext<DBContext.StockMarketContext>(options =>
+                options.UseNpgsql(Configuration.GetConnectionString("marketdb").Replace("redacted", postgresPW))
+            );
+
             services.AddHostedService<ScrapingService>();
-            
+            services.AddHostedService<MarketService>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
