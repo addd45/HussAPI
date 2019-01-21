@@ -8,8 +8,9 @@ using NHLAPISCrape.BluesScraper;
 using HussAPI.Interfaces;
 using Newtonsoft.Json;
 using Microsoft.Extensions.Options;
+using HussAPI.Helpers;
 
-namespace HussAPI.Classes
+namespace HussAPI.Services
 {
     public class ScrapingService : IScrapingService
     {
