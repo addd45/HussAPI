@@ -16,7 +16,7 @@ namespace HussAPI.Models
         public DateTime BoughtTime { get; set; }
         public double Volume { get; set; }
         public bool WentUp { get; set; }
-        public ushort MaxPercUp { get; set; }
+        public decimal MaxPercUp { get; set; }
         public decimal MaxPrice { get; set; }
         public DateTime MaxPercUpTime { get; set; }
     }
