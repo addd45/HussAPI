@@ -9,5 +9,9 @@ namespace HussAPI.Models
         public string Symbol { get; set; }
         [Key]
         public DateTime TradeDay { get; set; }
+        [Required]
+        public decimal Week52High { get; set; }
+        [Required]
+        public decimal AverageVolume { get; set; }
     }
 }

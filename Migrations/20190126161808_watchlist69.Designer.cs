@@ -3,15 +3,17 @@ using System;
 using HussAPI.DBContext;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 namespace HussAPI.Migrations
 {
     [DbContext(typeof(StockMarketContext))]
-    partial class StockMarketContextModelSnapshot : ModelSnapshot
+    [Migration("20190126161808_watchlist69")]
+    partial class watchlist69
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -53,10 +55,6 @@ namespace HussAPI.Migrations
                     b.Property<string>("Symbol");
 
                     b.Property<DateTime>("TradeDay");
-
-                    b.Property<decimal>("AverageVolume");
-
-                    b.Property<decimal>("Week52High");
 
                     b.HasKey("Symbol", "TradeDay");
 

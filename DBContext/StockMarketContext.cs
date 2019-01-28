@@ -21,6 +21,7 @@ namespace HussAPI.DBContext
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<MarketData>().HasKey(x => new { x.TradeDay, x.Symbol });
+            modelBuilder.Entity<StockWatchList>().HasKey(x => new { x.Symbol, x.TradeDay });
         }
         //protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
          //   => optionsBuilder.UseNpgsql("Host=my_host;Database=my_db;Username=my_user;Password=my_pw");

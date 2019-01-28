@@ -10,6 +10,7 @@ using HussAPI.DBContext;
 using HussAPI.Models;
 using AlphaVantage.Net.Stocks.TimeSeries;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace HussAPI.Services
 {
@@ -17,12 +18,13 @@ namespace HussAPI.Services
     {
         Timer _marketOpenTimer;
         AlphaVantageStocksClient _alphaClient;
-        StockMarketContext _dbContext;
+        private readonly IServiceScopeFactory _scopeFactory;
         ILogger _logger;
 
-        public MarketService(ILogger<MarketService> logger)
+        public MarketService(ILogger<MarketService> logger, IServiceScopeFactory scopeFactory)
         {
             _logger = logger;
+            _scopeFactory = scopeFactory;
         }
 
         public async Task StartAsync(CancellationToken cancellationToken)
@@ -33,7 +35,7 @@ namespace HussAPI.Services
 
         public async Task StopAsync(CancellationToken cancellationToken)
         {
-            _logger.LogInformation("MarketService stopping");            
+            _logger.LogInformation("MarketService stopping");
         }
 
         private async void ExecuteService(object state)
@@ -42,66 +44,73 @@ namespace HussAPI.Services
 
             if (!TradingHours())
             {
-                var nextOpen = DateTime.Today.AddDays(1).AddHours(8); //tomorrow at 8
-                var timeSpan = nextOpen - DateTime.Now;
-                _marketOpenTimer.Change(timeSpan, TimeSpan.FromMilliseconds( -1));
-                
-                _logger.LogInformation($"Not market hours, waiting for {timeSpan.TotalHours} more hours");
+                SetTimer();
                 return;
             }
 
-            var best = new Dictionary<string, MarketData>();
-            var old_interestingStocks = new Dictionary<string, StockInfo>(5);
+            await AnalyzeStocks();
+            SetTimer();
+        }
+
+        private void SetTimer()
+        {
+            var nextOpen = DateTime.Today.AddDays(1).AddHours(8); //tomorrow at 8
+            var timeSpan = nextOpen - DateTime.Now;
+            _marketOpenTimer.Change(timeSpan, TimeSpan.FromMilliseconds(-1));
+
+            _logger.LogInformation($"Not market hours, waiting for {timeSpan.TotalHours} more hours");
+            return;
+        }
+
+        private async Task AnalyzeStocks()
+        {
+            Dictionary<string, MarketData> marketDatas = new Dictionary<string, MarketData>(10);
+            MarketServiceHelper.DailyOldestPrices = new Dictionary<string, decimal>();
+
             while (TradingHours())
             {
-                var interestingStocks = await GetStocksOfInterest();
-                
-                //add all that didnt exist to old object
-                foreach(StockInfo iStock in interestingStocks){
-                    old_interestingStocks.TryAdd(iStock.Symbol, iStock);
+                Queue<StockInfo> toBuyStocks = new Queue<StockInfo>();
+                if (DateTime.Now.Hour <= 10)
+                {
+                    toBuyStocks = await GetStocksToBuy();
+                }
+                else if (toBuyStocks.Count == 0) // the time has passed to look for stocks and we didn't find anything. we're done.
+                {
+                    return;
                 }
 
-                var allStocks = interestingStocks.Union(old_interestingStocks.Values);
-                _logger.LogDebug($"{interestingStocks.Count} interesting stocks found");
+                _logger.LogDebug($"{toBuyStocks.Count} interesting stocks found");
 
-                foreach(var interestingStock in allStocks)
+                foreach (var buyStocks in toBuyStocks)
                 {
-                    var quote = await MarketAPIHelper.GetRealTimeQuote(interestingStock.Symbol, 2);
-
-                    //ty next
-                //TODO: be smarter about narrowing down (RSI n stuff)
-                    if (!ShouldBuy(quote)){
-                        _logger.LogDebug($"Not buying {interestingStock.Symbol}");
-                        continue;
-                    }
-
                     //fresh means best
-                    if (!best.ContainsKey(interestingStock.Symbol))
+                    if (!marketDatas.ContainsKey(buyStocks.Symbol))
                     {
-                        _logger.LogDebug($"buying stock {interestingStock.Symbol} for {interestingStock.LatestPrice}");
+                        _logger.LogDebug($"buying stock {buyStocks.Symbol} for {buyStocks.LatestPrice}");
 
-                        best.Add(interestingStock.Symbol, new MarketData(){
-                            BoughtPrice = interestingStock.LatestPrice,
+                        marketDatas.Add(buyStocks.Symbol, new MarketData()
+                        {
+                            BoughtPrice = buyStocks.LatestPrice,
                             BoughtTime = DateTime.Now,
-                            CompanyName = interestingStock.CompanyName,
-                            Symbol = interestingStock.Symbol,
+                            CompanyName = "notSupportedCurrently",
+                            Symbol = buyStocks.Symbol,
                             WentUp = false,
                             TradeDay = DateTime.Today,
-                            MaxPrice = interestingStock.LatestPrice,
-                            Volume = interestingStock.LatestVolume
+                            MaxPrice = buyStocks.LatestPrice,
+                            Volume = buyStocks.LatestVolume
                         });
                     }
                     //Data already exists now check whether or not its better
                     else
                     {
-                        var currentData = best[interestingStock.Symbol];
-                        var betterStock = GetBetterStock(currentData, interestingStock);
-                        best[interestingStock.Symbol] = betterStock;
+                        var currentData = marketDatas[buyStocks.Symbol];
+                        var betterStock = GetBetterStock(currentData, buyStocks);
+                        marketDatas[buyStocks.Symbol] = betterStock;
                     }
                 }
-                Thread.Sleep(90000);
+                Thread.Sleep(90000); //wait 1.5 min to check again
             }
-            await UpdateDatabase(best.Values);
+            await UpdateDatabase(marketDatas.Values);
         }
 
         private MarketData GetBetterStock(MarketData currentData, StockInfo newData)
@@ -124,46 +133,122 @@ namespace HussAPI.Services
             }
         }
 
-        private async Task<Queue<StockInfo>> GetStocksOfInterest()
+        private async Task<Queue<StockInfo>> GetStocksToBuy()
         {
-            var mostActive = await MarketAPIHelper.GetMostActive();
+            using (var dbContext = GetDbContext())
+            {
+                var watchStocks = dbContext.WatchList.Where(x => x.TradeDay.Date == DateTime.Today.Date).ToArray();
 
-            var myList = from quote in mostActive
-                         where quote.latestPrice < 7
-                         where quote.latestVolume > quote.avgTotalVolume
-                         where quote.primaryExchange.ToLower().StartsWith("nasdaq")
-                         //where quote.week52High < quote.latestPrice //TODO: think about it
-                         select new StockInfo(quote);
+                var watchSymbols = watchStocks.Select(x => x.Symbol);
+                int minutesSinceOpen = (DateTime.Now - DateTime.Today.Date.AddHours(8)).Minutes;
+                var stockQuotes = await MarketAPIHelper.GetQuotes(watchSymbols.ToArray());
+                var ret = new Queue<StockInfo>(watchStocks.Length);
 
-            return new Queue<StockInfo>(myList);
+                foreach (var quote in stockQuotes)
+                {
+                    var dataPoints = await MarketAPIHelper.GetIntraDayInfo(quote.Symbol, minutesSinceOpen + 1);
+                    var watchStock = watchStocks.Where(x => x.Symbol == quote.Symbol).FirstOrDefault();
+
+                    if (await ShouldBuy(watchStock.Week52High, watchStock.AverageVolume, dataPoints, quote.Symbol))
+                    {
+                        var tempSI = new StockInfo(quote)
+                        {
+                            Week52High = watchStock.Week52High,
+                            AverageTotalVolume = (double)watchStock.AverageVolume
+                        };
+                        ret.Enqueue(tempSI);
+                    }
+                    else
+                    {
+                        _logger.LogDebug("Deciding not to buy {0} .... yet", quote.Symbol);
+                    }
+                }
+
+                return ret;
+            }
         }
 
-        private bool ShouldBuy(IEnumerable<StockDataPoint> dataPoints)
+        private async Task<bool> ShouldBuy(decimal week52high, decimal avgVol, IEnumerable<StockDataPoint> dataPoints, string symbol)
         {
-            if (dataPoints == null && dataPoints.Count() < 2){
+            var list_dataPoints = dataPoints.ToList();
+            if (list_dataPoints == null && list_dataPoints.Count < 2) {
                 return false;
             }
 
-            //TODO: smarter stuff
-            var dataPoint_newer = dataPoints.First();
-            var dataPoint_older = dataPoints.ElementAt(1);
+            var currentOldest = list_dataPoints.Where(x => x.Time.Day == DateTime.Today.Day).Last();
+            decimal currentOldestPrice = currentOldest.OpeningPrice;
+            bool firstCheck = MarketServiceHelper.DailyOldestPrices.TryAdd(symbol, currentOldestPrice); //add oldest price if it doesnt exist already
+            var oldestTime = currentOldest.Time.TimeOfDay; 
+            bool isTodaysOpenValues = oldestTime.Hours == 9 && oldestTime.Minutes < 36; //found the damn near open price
+            int indexOfoldest = list_dataPoints.IndexOf(currentOldest);
+            list_dataPoints.RemoveRange(indexOfoldest, (list_dataPoints.Count - 1 - indexOfoldest)); //TODO: check this removes all the yesterday values
+            bool trendingUpish = TrendingUp(list_dataPoints.Select(l => l.ClosingPrice).ToArray());
 
-            //recent point closed higher than previous closed and volume increasin
-            return (dataPoint_newer.ClosingPrice > dataPoint_older.ClosingPrice &&  dataPoint_newer.Volume > dataPoint_older.Volume);
+            //Check for 52 week high momentum
+            ///is it early and high volume and price above 52 week high and trending up?
+            if (isTodaysOpenValues && trendingUpish && list_dataPoints.First().ClosingPrice > week52high && list_dataPoints.First().Volume > avgVol)
+            {
+                return true;
+            }
+            else if (trendingUpish)
+            {
+                //GET RSI
+                var rsiTask = MarketAPIHelper.GetRSI(symbol);
+                var cciTask = MarketAPIHelper.GetCCI(symbol);
+                var aroonTask = MarketAPIHelper.GetAroonOsc(symbol);
+
+                var results = await Task.WhenAll(rsiTask, cciTask, aroonTask);
+                decimal smartValue = SmartAlgorithm(results[0], results[1], results[2]);
+
+                return (smartValue >= 60); //TODO: obvi
+            }
+
+            return false;
+        }
+
+
+        //return a confidence percentage from 0 - 100
+        private decimal SmartAlgorithm(Queue<decimal> rsi, Queue<decimal> cci, Queue<decimal> aroon)
+        {
+            bool rsiTrendUp = TrendingUp(rsi.ToArray());
+            bool cciTrendUp = TrendingUp(cci.ToArray());
+            bool aroonTrendup = TrendingUp(aroon.ToArray());
+
+            //TODO figure out if we can even use these to predict
+            int binary = Convert.ToInt32(rsiTrendUp) + Convert.ToInt32(cciTrendUp) + Convert.ToInt32(aroonTrendup);
+
+
+            return 30 * binary; //TODO: whatever smart value I come up with that eventually determines buy or nah
+        }
+
+        private bool TrendingUp(params decimal[] values)
+        {
+            int denom = values.Count();
+            if (denom < 1)
+            {
+                return false;
+            }
+
+            decimal last = values.Last();
+            decimal avg = values.Average();
+
+            return last > avg;
         }
 
         private async Task UpdateDatabase(IEnumerable<MarketData> marketData)
         {
-            using (var context = new StockMarketContext())
+            using (var dbContext = GetDbContext())
             {
-                await _dbContext.AddRangeAsync(marketData);
-                await context.SaveChangesAsync();
+                await dbContext.AddRangeAsync(marketData);
+                await dbContext.SaveChangesAsync();
             }
         }
 
         private bool TradingHours()
         {
-            //return true;
+            if (DateTime.Today.DayOfWeek == DayOfWeek.Saturday || DateTime.Today.DayOfWeek == DayOfWeek.Sunday){
+                return false;
+            }
             var timeSinceMidnight = DateTime.Now.TimeOfDay;
 
             //between 8 - 3
@@ -173,7 +258,13 @@ namespace HussAPI.Services
             }
             return false;
         }
-        
+
+        private StockMarketContext GetDbContext()
+        {
+            var scope = _scopeFactory.CreateScope();
+            return scope.ServiceProvider.GetRequiredService<StockMarketContext>();
+        }
+
         public void Dispose()
         {
             throw new NotImplementedException();
