@@ -11,9 +11,11 @@
   <ItemGroup>
     <PackageReference Include="AlphaVantage.Net.Stocks" Version="1.0.2" />
     <PackageReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="2.1.1" />
     <PackageReference Include="MQTTnet.AspNetCore" Version="2.8.5" />
     <PackageReference Include="NHLAPIScrape" Version="1.1.0" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="2.1.0" />
+    <PackageReference Include="YahooFantasyWrapper" Version="1.0.0" />
   </ItemGroup>
 
 </Project>

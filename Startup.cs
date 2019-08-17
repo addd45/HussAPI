@@ -10,6 +10,9 @@ using Microsoft.Extensions.Options;
 using HussAPI.Services;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
+using YahooFantasyWrapper.Configuration;
+using YahooFantasyWrapper.Client;
+using YahooFantasyWrapper.Infrastructure;
 
 namespace HussAPI
 {
@@ -27,12 +30,18 @@ namespace HussAPI
         {
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_1);
             services.Configure<MQTTSettings>(Configuration.GetSection("MQTTSettings"));
+            services.Configure<YahooConfiguration>(Configuration.GetSection("YahooConfiguration"));
 
             //DBContexts
             string postgresPW = Environment.GetEnvironmentVariable("POSTGRES_PASS");
             services.AddDbContext<DBContext.StockMarketContext>(options =>
                 options.UseNpgsql(Configuration.GetConnectionString("marketdb").Replace("redacted", postgresPW))
             );
+
+            services.AddTransient<IYahooFantasyClient, YahooFantasyClient>();
+            services.AddTransient<IYahooAuthClient, YahooAuthClient>();
+            services.AddTransient<IRequestFactory, RequestFactory>();
+            services.AddTransient<FantasyHockeyTool>(); 
 
             services.AddHostedService<ScrapingService>();
             services.AddHostedService<MarketService>();
