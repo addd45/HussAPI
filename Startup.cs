@@ -39,7 +39,7 @@ namespace HussAPI
             );
 
             services.AddTransient<IYahooFantasyClient, YahooFantasyClient>();
-            services.AddTransient<IYahooAuthClient, YahooAuthClient>();
+            services.AddSingleton<IYahooAuthClient, YahooAuthClient>();
             services.AddTransient<IRequestFactory, RequestFactory>();
             services.AddTransient<FantasyHockeyTool>(); 
 

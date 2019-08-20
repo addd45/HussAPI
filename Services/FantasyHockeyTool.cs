@@ -24,6 +24,8 @@ namespace HussAPI.Services
         private readonly IYahooFantasyClient _fantasy;
         private readonly IYahooAuthClient _client;
 
+        readonly string game_code = "nhl.l.1344";
+
         public FantasyHockeyTool(ILogger<FantasyHockeyTool> logger, IYahooAuthClient client, IYahooFantasyClient fantasyClient)
         {
             _logger = logger;
@@ -44,6 +46,11 @@ namespace HussAPI.Services
         public async Task<UserInfo> GetUserProfile(NameValueCollection parameters)
         {
             return await _client.GetUserInfo(parameters);
+        }
+
+        public async Task<League> GetLeagueTest(string code)
+        {
+            return await _fantasy.LeagueResourceManager.GetDraftResults(code, _client.Auth.AccessToken);
         }
     }
 }
